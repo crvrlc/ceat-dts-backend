@@ -1,0 +1,230 @@
+// Document Tracking System - Prisma Schema
+// Stack: Node + Express + Prisma + PostgreSQL + Cloudinary + Nodemailer
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────
+// ENUMS
+// ─────────────────────────────────────────────
+
+enum Role {
+  student
+  staff
+  admin
+}
+
+enum DocumentStatus {
+  submitted
+  received
+  processing
+  for_signature
+  completed
+  released
+  rejected
+}
+
+enum SubmissionMethod {
+  online
+  in_person
+}
+
+enum ReleaseMethod {
+  online
+  in_person
+}
+
+// ─────────────────────────────────────────────
+// SEMESTER
+// ─────────────────────────────────────────────
+
+model Semester {
+  id          Int      @id @default(autoincrement())
+  name        String   // e.g. "2nd Semester"
+  schoolYear  String   // e.g. "2025-2026"
+  code        String   @unique // e.g. "1252"
+  period      String?   // e.g. "November 2025 - March 2026"
+  isCurrent   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  documents         Document[]
+  sequences         DocumentTypeSequence[]
+}
+
+// ─────────────────────────────────────────────
+// DOCUMENT TYPE
+// ─────────────────────────────────────────────
+
+model DocumentType {
+  id        Int      @id @default(autoincrement())
+  name      String   // e.g. "Consent of Instructor"
+  code      String   @unique // e.g. "COI" (3 letters)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  documents         Document[]
+  staffAssignments  DocumentTypeStaffAssignment[]
+  sequences         DocumentTypeSequence[]
+}
+
+// ─────────────────────────────────────────────
+// USER
+// ─────────────────────────────────────────────
+
+model User {
+  id          Int      @id @default(autoincrement())
+  name        String
+  email       String   @unique
+  photo       String?  // from Google OAuth
+  role        Role     @default(student)
+  // For staff/admin
+  position    String?  // e.g. "Records Officer"
+  isActive    Boolean  @default(true)
+  googleId    String?  @unique
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // As student
+  submittedDocuments  Document[]    @relation("StudentDocuments")
+
+  // As assigned staff
+  assignedDocuments   Document[]    @relation("AssignedStaffDocuments")
+
+  // Activity logs performed by this user
+  activityLogs        ActivityLog[]
+
+  // Default staff assignment per document type
+  documentTypeAssignments DocumentTypeStaffAssignment[]
+}
+
+// ─────────────────────────────────────────────
+// DOCUMENT TYPE ↔ STAFF DEFAULT ASSIGNMENT
+// Which staff handles which document type by default
+// ─────────────────────────────────────────────
+
+model DocumentTypeStaffAssignment {
+  id             Int          @id @default(autoincrement())
+  documentTypeId Int
+  staffId        Int
+  createdAt      DateTime     @default(now())
+
+  documentType   DocumentType @relation(fields: [documentTypeId], references: [id])
+  staff          User         @relation(fields: [staffId], references: [id])
+
+  @@unique([documentTypeId, staffId])
+}
+
+// ─────────────────────────────────────────────
+// SEQUENCE COUNTER
+// Tracks the last used sequence number per semester + doc type
+// Prevents gaps from affecting future numbering
+// ─────────────────────────────────────────────
+
+model DocumentTypeSequence {
+  id             Int          @id @default(autoincrement())
+  semesterId     Int
+  documentTypeId Int
+  lastSequence   Int          @default(0)
+
+  semester       Semester     @relation(fields: [semesterId], references: [id])
+  documentType   DocumentType @relation(fields: [documentTypeId], references: [id])
+
+  @@unique([semesterId, documentTypeId])
+}
+
+// ─────────────────────────────────────────────
+// DOCUMENT (main entity)
+// ─────────────────────────────────────────────
+
+model Document {
+  id               Int              @id @default(autoincrement())
+  trackingCode     String           @unique // e.g. "1252-COI-001"
+  semesterId       Int
+  documentTypeId   Int
+  studentId        Int
+  assignedStaffId  Int?             // null until assigned
+  originalFileName  String?
+  scannedFileName String?
+
+  status           DocumentStatus   @default(submitted)
+  submissionMethod SubmissionMethod
+  releaseMethod    ReleaseMethod
+
+  // File attachments (Cloudinary URLs)
+  studentFileUrl   String?          // uploaded by student (online submission)
+  scannedFileUrl   String?          // scanned by staff (in-person submission)
+
+  // Optional notes from student
+  notes            String?
+
+  // Staff remarks/comments
+  remarks          String?
+
+  // Notify student via email on update
+  notifyStudent    Boolean          @default(false)
+
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  semester         Semester         @relation(fields: [semesterId], references: [id])
+  documentType     DocumentType     @relation(fields: [documentTypeId], references: [id])
+  student          User             @relation("StudentDocuments", fields: [studentId], references: [id])
+  assignedStaff    User?            @relation("AssignedStaffDocuments", fields: [assignedStaffId], references: [id])
+
+  activityLogs     ActivityLog[]
+}
+
+// ─────────────────────────────────────────────
+// STAFF REGISTRATION WHITELIST
+// Admin pre-registers staff emails before they can log in
+// ─────────────────────────────────────────────
+
+model StaffRegistration {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  role      Role     @default(staff)
+  position  String?
+  isUsed    Boolean  @default(false)
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+}
+
+// ─────────────────────────────────────────────
+// STUDENT REGISTRATION WHITELIST
+// Admin pre-registers student emails before they can log in
+// ─────────────────────────────────────────────
+
+model StudentRegistration {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  isUsed    Boolean  @default(false)
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+}
+
+// ─────────────────────────────────────────────
+// ACTIVITY LOG
+// Timeline of everything that happened to a document
+// ─────────────────────────────────────────────
+
+model ActivityLog {
+  id           Int            @id @default(autoincrement())
+  documentId   Int
+  performedById Int           // who did the action
+  action       String         // e.g. "Status updated to Processing"
+  fromStatus   DocumentStatus?
+  toStatus     DocumentStatus?
+  remarks      String?        // optional note attached to this action
+  createdAt    DateTime       @default(now())
+
+  document     Document       @relation(fields: [documentId], references: [id])
+  performedBy  User           @relation(fields: [performedById], references: [id])
+}
