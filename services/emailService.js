@@ -135,6 +135,10 @@ const sendDocumentUpdateEmail = async ({ studentName, studentEmail, trackingCode
     </div>
   `.trim();
 
+  console.log('EMAIL_USER:', process.env.EMAIL_USER)
+  console.log('EMAIL_PASS set:', !!process.env.EMAIL_PASS)
+  console.log('EMAIL_FROM:', process.env.EMAIL_FROM)
+
   await transporter.sendMail({
     from: `"CEAT OCS Document Tracking System" <${process.env.EMAIL_FROM}>`,
     to: studentEmail,
