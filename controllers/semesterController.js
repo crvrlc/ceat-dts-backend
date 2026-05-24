@@ -5,8 +5,16 @@ const prisma = require('../config/prisma');
 // e.g. "1st Semester 2025-2026" → "1251"
 // e.g. "2nd Semester 2025-2026" → "1252"
 const generateSemesterCode = (name, schoolYear) => {
-  const startYear = schoolYear.split('-')[0].slice(-2); // "25" from "2025-2026"
-  const semNumber = name.toLowerCase().includes('2nd') ? '2' : '1';
+  const startYear = schoolYear.split('-')[0].slice(-2);
+  const lowerName = name.toLowerCase();
+  let semNumber;
+  if (lowerName.includes('2nd')) {
+    semNumber = '2';
+  } else if (lowerName.includes('midyear') || lowerName.includes('mid-year') || lowerName.includes('summer')) {
+    semNumber = '3';
+  } else {
+    semNumber = '1';
+  }
   return `1${startYear}${semNumber}`;
 };
 
