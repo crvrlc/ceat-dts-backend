@@ -165,6 +165,11 @@ exports.deleteUser = async (req, res) => {
     res.status(200).json({ success: true, message: 'User deleted and registration state synced' });
   } catch (error) {
     console.error('Delete user error:', error);
+    if (error.code === 'P2003') {
+      return res.status(400).json({ 
+        message: 'Cannot delete this staff member because they have existing assignments. Please remove their assignments first.' 
+      });
+    }
     res.status(500).json({ message: error.message });
   }
 };
