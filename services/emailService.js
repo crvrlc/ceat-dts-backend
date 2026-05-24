@@ -1,5 +1,31 @@
-const { Resend } = require('resend');
-const resend = new Resend(process.env.RESEND_API_KEY);
+const nodemailer = require('nodemailer');
+const { google } = require('googleapis');
+
+const createTransporter = async () => {
+  const oauth2Client = new google.auth.OAuth2(
+    process.env.GMAIL_CLIENT_ID,
+    process.env.GMAIL_CLIENT_SECRET,
+    'https://developers.google.com/oauthplayground'
+  );
+
+  oauth2Client.setCredentials({
+    refresh_token: process.env.GMAIL_REFRESH_TOKEN,
+  });
+
+  const accessToken = await oauth2Client.getAccessToken();
+
+  return nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+      type: 'OAuth2',
+      user: process.env.EMAIL_USER,
+      clientId: process.env.GMAIL_CLIENT_ID,
+      clientSecret: process.env.GMAIL_CLIENT_SECRET,
+      refreshToken: process.env.GMAIL_REFRESH_TOKEN,
+      accessToken: accessToken.token,
+    },
+  });
+};
 
 const STATUS_LABELS = {
   submitted:     'Submitted',
@@ -128,8 +154,10 @@ const sendDocumentUpdateEmail = async ({ studentName, studentEmail, trackingCode
     </div>
   `.trim();
 
-  await resend.emails.send({
-    from: 'CEAT OCS Document Tracking System <onboarding@resend.dev>',
+  const transporter = await createTransporter();
+
+  await transporter.sendMail({
+    from: `"CEAT OCS Document Tracking System" <${process.env.EMAIL_USER}>`,
     to: studentEmail,
     subject: `Document Update [${trackingCode}] - ${statusLabel}`,
     html,
