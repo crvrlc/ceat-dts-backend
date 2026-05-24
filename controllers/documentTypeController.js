@@ -141,6 +141,11 @@ exports.deleteDocumentType = async (req, res) => {
 
     res.status(200).json({ success: true, message: 'Document type deleted successfully' });
   } catch (error) {
+    if (error.code === 'P2003') {
+      return res.status(400).json({
+        message: 'Cannot delete this document type because it has existing assignments or references. Please remove them first.'
+      });
+    }
     res.status(500).json({ message: error.message });
   }
 };
