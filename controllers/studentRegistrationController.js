@@ -6,7 +6,7 @@ const prisma = require('../config/prisma');
 exports.getStudentRegistrations = async (req, res) => {
   try {
     const page = Math.max(1, parseInt(req.query.page) || 1);
-    const limit = Math.max(1, Math.min(100, parseInt(req.query.limit) || 20));
+    const limit = Math.max(1, Math.min(5000, parseInt(req.query.limit) || 20));
     const search = req.query.search?.trim() || '';
     const skip = (page - 1) * limit;
 
