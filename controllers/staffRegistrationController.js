@@ -1,5 +1,11 @@
 const prisma = require('../config/prisma');
 
+const logActivity = async (performedById, action, entityType, entityId) => {
+  await prisma.activityLog.create({
+    data: { performedById, action, entityType, entityId }
+  });
+};
+
 // @desc    Pre-register staff email
 // @route   POST /api/staff-registrations
 // @access  Private (Admin only)
@@ -23,6 +29,8 @@ exports.registerStaffEmail = async (req, res) => {
         position: position || null
       }
     });
+
+    await logActivity(req.user.id, `Pre-registered staff email: ${registration.email} (${registration.role})`, 'staff', registration.id);
 
     res.status(201).json({
       success: true,
@@ -73,6 +81,8 @@ exports.deleteStaffRegistration = async (req, res) => {
     }
 
     await prisma.staffRegistration.delete({ where: { id: parseInt(req.params.id) } });
+
+    await logActivity(req.user.id, `Deleted staff registration: ${registration.email}`, 'staff', registration.id);
 
     res.status(200).json({ success: true, message: 'Staff registration deleted successfully' });
   } catch (error) {

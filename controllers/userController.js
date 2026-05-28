@@ -1,5 +1,11 @@
 const prisma = require('../config/prisma');
 
+const logActivity = async (performedById, action, entityType, entityId) => {
+  await prisma.activityLog.create({
+    data: { performedById, action, entityType, entityId }
+  });
+};
+
 // @desc    Get all users
 // @route   GET /api/users
 // @access  Private (Admin only)
@@ -102,6 +108,8 @@ exports.updateUserRole = async (req, res) => {
       }
     });
 
+    await logActivity(req.user.id, `Updated ${user.name}'s role from ${user.role} to ${role}`, 'staff', user.id);
+
     res.status(200).json({ success: true, message: 'User updated successfully', user: updated });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -120,6 +128,8 @@ exports.toggleUserStatus = async (req, res) => {
       where: { id: parseInt(req.params.id) },
       data: { isActive: !user.isActive }
     });
+
+    await logActivity(req.user.id, `${updated.isActive ? 'Activated' : 'Deactivated'} user: ${user.name}`, 'staff', user.id);
 
     res.status(200).json({
       success: true,
@@ -161,6 +171,8 @@ exports.deleteUser = async (req, res) => {
         data: { isUsed: false, usedAt: null }
       });
     }
+
+    await logActivity(req.user.id, `Deleted user: ${user.name} (${user.role})`, 'staff', user.id);
 
     res.status(200).json({ success: true, message: 'User deleted and registration state synced' });
   } catch (error) {

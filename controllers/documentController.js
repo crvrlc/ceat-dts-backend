@@ -504,16 +504,13 @@ exports.deleteDocument = async (req, res) => {
     // Delete files from Cloudinary
     const filesToDelete = [document.studentFileUrl, document.scannedFileUrl].filter(Boolean);
     for (const url of filesToDelete) {
-      // Extract public_id from Cloudinary URL
       const parts = url.split('/');
       const publicId = `dts-documents/${parts[parts.length - 1].split('.')[0]}`;
-      await cloudinary.uploader.destroy(publicId).catch(() => {}); // fail silently
+      await cloudinary.uploader.destroy(publicId).catch(() => {});
     }
 
-    // Delete activity logs first
-    await prisma.activityLog.deleteMany({ where: { documentId: docId } });
+    // ← REMOVED: prisma.activityLog.deleteMany
 
-    // Then delete the document
     await prisma.document.delete({ where: { id: docId } });
 
     res.status(200).json({ success: true, message: 'Document deleted successfully' });

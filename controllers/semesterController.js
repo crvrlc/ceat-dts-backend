@@ -1,5 +1,11 @@
 const prisma = require('../config/prisma');
 
+const logActivity = async (performedById, action, entityType, entityId) => {
+  await prisma.activityLog.create({
+    data: { performedById, action, entityType, entityId }
+  });
+};
+
 // Generate semester code from name and school year
 // Format: 1 + last 2 digits of start year + semester number
 // e.g. "1st Semester 2025-2026" → "1251"
@@ -44,6 +50,8 @@ exports.createSemester = async (req, res) => {
     const semester = await prisma.semester.create({
       data: { name, schoolYear, code, period: period || null, isCurrent: isCurrent || false }
     });
+
+    await logActivity(req.user.id, `Created semester: ${name} ${schoolYear} (${code})`, 'semester', semester.id);
 
     res.status(201).json({
       success: true,
@@ -146,6 +154,8 @@ exports.updateSemester = async (req, res) => {
       }
     });
 
+    await logActivity(req.user.id, `Updated semester: ${semester.name} ${semester.schoolYear} (${semester.code})`, 'semester', semester.id);
+
     res.status(200).json({
       success: true,
       message: 'Semester updated successfully',
@@ -172,6 +182,8 @@ exports.setCurrentSemester = async (req, res) => {
       data: { isCurrent: true }
     });
 
+    await logActivity(req.user.id, `Set current semester: ${semester.name} ${semester.schoolYear} (${semester.code})`, 'semester', semester.id);
+
     res.status(200).json({
       success: true,
       message: 'Current semester updated',
@@ -197,6 +209,8 @@ exports.deleteSemester = async (req, res) => {
     }
 
     await prisma.semester.delete({ where: { id: parseInt(req.params.id) } });
+
+    await logActivity(req.user.id, `Deleted semester: ${semester.name} ${semester.schoolYear} (${semester.code})`, 'semester', semester.id);
 
     res.status(200).json({ success: true, message: 'Semester deleted successfully' });
   } catch (error) {

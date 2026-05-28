@@ -1,5 +1,11 @@
 const prisma = require('../config/prisma');
 
+const logActivity = async (performedById, action, entityType, entityId) => {
+  await prisma.activityLog.create({
+    data: { performedById, action, entityType, entityId }
+  });
+};
+
 // @desc    Get all student registrations (paginated + searchable)
 // @route   GET /api/student-registrations
 // @access  Private (Admin/Staff)
@@ -61,6 +67,8 @@ exports.addStudentRegistration = async (req, res) => {
       data: { email: normalizedEmail }
     });
 
+    await logActivity(req.user.id, `Added student registration: ${normalizedEmail}`, 'student', registration.id);
+
     res.status(201).json({ success: true, registration });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -110,6 +118,8 @@ exports.bulkAddStudentRegistrations = async (req, res) => {
       });
     }
 
+    await logActivity(req.user.id, `Bulk added ${toInsert.length} student(s), ${skippedCount} skipped`, 'student', null);
+
     res.status(201).json({
       success: true,
       added: toInsert.length,
@@ -141,6 +151,8 @@ exports.deleteStudentRegistration = async (req, res) => {
     }
 
     await prisma.studentRegistration.delete({ where: { id: parseInt(req.params.id) } });
+
+    await logActivity(req.user.id, `Removed student registration: ${registration.email}`, 'student', registration.id);
 
     res.status(200).json({ success: true, message: 'Registration removed' });
   } catch (error) {

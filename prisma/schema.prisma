@@ -217,14 +217,16 @@ model StudentRegistration {
 
 model ActivityLog {
   id           Int            @id @default(autoincrement())
-  documentId   Int
+  documentId   Int?
   performedById Int           // who did the action
   action       String         // e.g. "Status updated to Processing"
-  fromStatus   DocumentStatus?
+  entityType    String?         // "document", "student", "staff", "semester", "document_type"
+  entityId      Int?            // id of the entity affected  fromStatus   DocumentStatus?
+  fromStatus     DocumentStatus?
   toStatus     DocumentStatus?
   remarks      String?        // optional note attached to this action
   createdAt    DateTime       @default(now())
 
-  document     Document       @relation(fields: [documentId], references: [id])
+  document     Document?       @relation(fields: [documentId], references: [id], onDelete: SetNull)
   performedBy  User           @relation(fields: [performedById], references: [id])
 }

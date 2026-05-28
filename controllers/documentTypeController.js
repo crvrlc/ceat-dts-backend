@@ -1,5 +1,11 @@
 const prisma = require('../config/prisma');
 
+const logActivity = async (performedById, action, entityType, entityId) => {
+  await prisma.activityLog.create({
+    data: { performedById, action, entityType, entityId }
+  });
+};
+
 // @desc    Create document type
 // @route   POST /api/document-types
 // @access  Private (Admin only)
@@ -13,6 +19,8 @@ exports.createDocumentType = async (req, res) => {
         code: code.toUpperCase()
       }
     });
+
+    await logActivity(req.user.id, `Created document type: ${name} (${code.toUpperCase()})`, 'document_type', documentType.id);
 
     res.status(201).json({
       success: true,
@@ -101,6 +109,12 @@ exports.updateDocumentType = async (req, res) => {
       }
     });
 
+    const action = isActive !== undefined && isActive !== existing.isActive
+        ? `${documentType.isActive ? 'Activated' : 'Deactivated'} document type: ${documentType.name}`
+        : `Updated document type: ${documentType.name} (${documentType.code})`;
+
+    await logActivity(req.user.id, action, 'document_type', documentType.id);
+    
     res.status(200).json({
       success: true,
       message: 'Document type updated successfully',
@@ -143,6 +157,8 @@ exports.deleteDocumentType = async (req, res) => {
     });
 
     await prisma.documentType.delete({ where: { id: parseInt(req.params.id) } });
+
+    await logActivity(req.user.id, `Deleted document type: ${existing.name} (${existing.code})`, 'document_type', existing.id);
 
     res.status(200).json({ success: true, message: 'Document type deleted successfully' });
   } catch (error) {
@@ -191,6 +207,11 @@ exports.setDocumentTypeStaff = async (req, res) => {
       }
     });
 
+    const docType = await prisma.documentType.findUnique({ where: { id: parseInt(req.params.id) } });
+    const staff = await prisma.user.findUnique({ where: { id: parseInt(staffId) } });
+    await logActivity(req.user.id, `Assigned ${staff.name} to document type: ${docType.name}`, 'document_type', parseInt(req.params.id));
+
+
     res.status(200).json({
       success: true,
       message: 'Default staff assigned to document type',
@@ -206,6 +227,9 @@ exports.setDocumentTypeStaff = async (req, res) => {
 // @access  Private (Admin only)
 exports.removeDocumentTypeStaff = async (req, res) => {
   try {
+    const docType = await prisma.documentType.findUnique({ where: { id: parseInt(req.params.id) } });
+    const staff = await prisma.user.findUnique({ where: { id: parseInt(req.params.staffId) } });
+    
     await prisma.documentTypeStaffAssignment.delete({
       where: {
         documentTypeId_staffId: {
@@ -214,6 +238,9 @@ exports.removeDocumentTypeStaff = async (req, res) => {
         }
       }
     });
+
+    await logActivity(req.user.id, `Removed ${staff.name} from document type: ${docType.name}`, 'document_type', parseInt(req.params.id));
+
 
     res.status(200).json({ success: true, message: 'Staff removed from document type' });
   } catch (error) {
