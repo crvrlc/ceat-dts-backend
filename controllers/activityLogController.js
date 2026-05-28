@@ -13,15 +13,13 @@ exports.getActivityLogs = async (req, res) => {
 
     const where = {
       ...(documentId && { documentId: parseInt(documentId) }),
-      // Combined search: tracking code OR performer name
       ...(search && {
         OR: [
-          { document: { trackingCode: { contains: search, mode: 'insensitive' } } },
           { performedBy: { name: { contains: search, mode: 'insensitive' } } },
           { action: { contains: search, mode: 'insensitive' } },
+          { document: { trackingCode: { contains: search, mode: 'insensitive' } } },
         ]
       }),
-      // Legacy trackingCode filter (keep for backward compat)
       ...(trackingCode && !search && {
         document: { trackingCode: { contains: trackingCode, mode: 'insensitive' } }
       }),
