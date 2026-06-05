@@ -509,8 +509,14 @@ exports.deleteDocument = async (req, res) => {
       await cloudinary.uploader.destroy(publicId).catch(() => {});
     }
 
-    // ← REMOVED: prisma.activityLog.deleteMany
-
+    await logActivity(
+      docId,
+      req.user.id,
+      `Document deleted (${document.trackingCode})`,
+      document.status,
+      null
+    );
+    
     await prisma.document.delete({ where: { id: docId } });
 
     res.status(200).json({ success: true, message: 'Document deleted successfully' });
