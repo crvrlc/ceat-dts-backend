@@ -18,6 +18,7 @@ const STATUS_LABELS = {
   submitted:     'Submitted',
   received:      'Received',
   processing:    'Processing',
+  action_required: 'Action Required',
   for_signature: 'For Signature',
   completed:     'Completed',
   released:      'Released',
@@ -30,6 +31,8 @@ const getStatusMessage = (status, releaseMethod) => {
       return 'We have received your document at the office. Our staff will begin processing it shortly.';
     case 'processing':
       return 'Your document is currently being processed by our staff.';
+     case 'action_required':
+      return 'Action is required from you to continue processing your document. Please log in to the system to view the instructions.';
     case 'for_signature':
       return 'Your document is awaiting signature approval and will be ready soon.';
     case 'completed':
@@ -55,6 +58,7 @@ const sendDocumentUpdateEmail = async ({ studentName, studentEmail, trackingCode
     submitted:     { bg: '#fef6e0', text: '#7a4f00', border: '#f5a800' },
     received:      { bg: '#dbeafe', text: '#1e40af', border: '#3b82f6' },
     processing:    { bg: '#ede9fe', text: '#4c1d95', border: '#8b5cf6' },
+    action_required: { bg: '#fff3cd', text: '#856404', border: '#ffc107' },
     for_signature: { bg: '#f5e6e8', text: '#7b1113', border: '#7b1113' },
     completed:     { bg: '#e6f2e7', text: '#1a5c1e', border: '#236a27' },
     released:      { bg: '#d1fae5', text: '#065f46', border: '#10b981' },

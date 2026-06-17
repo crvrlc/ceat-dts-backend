@@ -9,6 +9,7 @@ const {
   updateDocumentStatus,
   receiveDocument,
   deleteDocument,
+  submitRevision
 } = require('../controllers/documentController');
 const { protect, authorize } = require('../middleware/authMiddleware');
 const upload = require('../middleware/upload');
@@ -23,6 +24,7 @@ router.get('/track/:trackingCode', trackDocument);
 // Student routes
 router.post('/', protect, authorize('student'), upload.single('file'), submitDocument);
 router.get('/stats', protect, authorize('student'), getDocumentStats);
+router.patch('/:id/revise', protect, authorize('student'), upload.single('file'), submitRevision);
 
 // All authenticated users
 router.get('/', protect, getDocuments);
@@ -32,6 +34,7 @@ router.get('/:id', protect, getDocument);
 router.patch('/:id/assign', protect, authorize('staff', 'admin'), assignDocument);
 router.patch('/:id/status', protect, authorize('staff', 'admin'), upload.single('file'), updateDocumentStatus);
 router.patch('/:id/receive', protect, authorize('staff', 'admin'), receiveDocument);
+
 
 // Email notification
 router.post('/:id/notify', protect, authorize('staff', 'admin'), async (req, res) => {

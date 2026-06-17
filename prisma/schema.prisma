@@ -24,6 +24,7 @@ enum DocumentStatus {
   submitted
   received
   processing
+  action_required
   for_signature
   completed
   released
@@ -167,6 +168,14 @@ model Document {
 
   // Staff remarks/comments
   remarks          String?
+
+  // Action Required fields
+  actionRequiredFileUrl   String?   // file staff sends to student
+  actionRequiredFileName  String?
+
+  // Student's response to action required
+  revisedFileUrl    String?
+  revisedFileName   String?
 
   // Notify student via email on update
   notifyStudent    Boolean          @default(false)

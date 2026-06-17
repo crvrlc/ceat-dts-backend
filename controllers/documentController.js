@@ -5,7 +5,6 @@ const { cloudinary } = require('../config/cloudinary');
 // HELPERS
 // ─────────────────────────────────────────────
 
-// Generate tracking code e.g. "1252-COI-003"
 const generateTrackingCode = async (semesterId, documentTypeId) => {
   const [semester, documentType] = await Promise.all([
     prisma.semester.findUnique({ where: { id: semesterId } }),
@@ -14,7 +13,6 @@ const generateTrackingCode = async (semesterId, documentTypeId) => {
 
   if (!semester || !documentType) throw new Error('Invalid semester or document type');
 
-  // Increment sequence atomically
   const sequence = await prisma.documentTypeSequence.upsert({
     where: { semesterId_documentTypeId: { semesterId, documentTypeId } },
     update: { lastSequence: { increment: 1 } },
@@ -25,18 +23,13 @@ const generateTrackingCode = async (semesterId, documentTypeId) => {
   return `${semester.code}-${documentType.code}-${number}`;
 };
 
-// Get default assigned staff for a document type
 const getDefaultStaff = async (documentTypeId) => {
   const assignment = await prisma.documentTypeStaffAssignment.findFirst({
-    where: { 
-      documentTypeId,
-      staff: { isActive: true } 
-    }
+    where: { documentTypeId, staff: { isActive: true } }
   });
   return assignment?.staffId || null;
 };
 
-// Log activity
 const logActivity = async (documentId, performedById, action, fromStatus = null, toStatus = null, remarks = null) => {
   await prisma.activityLog.create({
     data: { documentId, performedById, action, fromStatus, toStatus, remarks }
@@ -47,40 +40,30 @@ const logActivity = async (documentId, performedById, action, fromStatus = null,
 // CONTROLLERS
 // ─────────────────────────────────────────────
 
-// @desc    Submit a new document (Student)
-// @route   POST /api/documents
-// @access  Private (Student)
 exports.submitDocument = async (req, res) => {
   try {
     const { documentTypeId, submissionMethod, releaseMethod, notes, originalFileName } = req.body;
     const docTypeId = parseInt(documentTypeId);
 
-    // Validate file for online submission
     if (submissionMethod === 'online' && !req.file) {
       return res.status(400).json({ message: 'Please upload a file for online submission' });
     }
 
-    // Validate document type
     const documentType = await prisma.documentType.findUnique({ where: { id: docTypeId } });
     if (!documentType) return res.status(404).json({ message: 'Document type not found' });
     if (!documentType.isActive) return res.status(400).json({ message: 'This document type is not currently available' });
 
-    // Get current semester
     const semester = await prisma.semester.findFirst({ where: { isCurrent: true } });
     if (!semester) return res.status(400).json({ message: 'No active semester found. Please contact the administrator.' });
 
-    // Generate tracking code
     const trackingCode = await generateTrackingCode(semester.id, docTypeId);
 
-    // Auto-assign staff for online submissions
     const assignedStaffId = submissionMethod === 'online'
       ? await getDefaultStaff(docTypeId)
-      : null; // in-person stays unassigned until received
+      : null;
 
-    // File URL from Cloudinary (if uploaded)
     const studentFileUrl = req.file ? req.file.path : null;
 
-    // Create document
     const document = await prisma.document.create({
       data: {
         trackingCode,
@@ -102,7 +85,6 @@ exports.submitDocument = async (req, res) => {
       }
     });
 
-    // Log activity
     await logActivity(
       document.id,
       req.user.id,
@@ -123,9 +105,6 @@ exports.submitDocument = async (req, res) => {
   }
 };
 
-// @desc    Get all documents (with filters + pagination)
-// @route   GET /api/documents
-// @access  Private
 exports.getDocuments = async (req, res) => {
   try {
     const {
@@ -134,10 +113,6 @@ exports.getDocuments = async (req, res) => {
       page = 1, limit = 20
     } = req.query;
 
-    // console.log('user id:', req.user.id);
-    // console.log('user role:', req.user.role);
-    // console.log('assignedOnly:', assignedOnly);
-
     const pageNum = Math.max(1, parseInt(page));
     const limitNum = Math.max(1, Math.min(100, parseInt(limit)));
     const skip = (pageNum - 1) * limitNum;
@@ -145,7 +120,6 @@ exports.getDocuments = async (req, res) => {
     const where = {
       ...(req.user.role === 'student' && { studentId: req.user.id }),
       ...((req.user.role === 'staff' || req.user.role === 'admin') && assignedOnly === 'true' && { assignedStaffId: req.user.id }),
-
       ...(status && { status }),
       ...(documentTypeId && { documentTypeId: parseInt(documentTypeId) }),
       ...(submissionMethod && { submissionMethod }),
@@ -158,37 +132,35 @@ exports.getDocuments = async (req, res) => {
       })
     };
 
-   const [documents, totalCount] = await Promise.all([
-    prisma.document.findMany({
-      where,
-      include: {
-        student: { select: { name: true, email: true, photo: true } },
-        documentType: { 
-          select: { 
-            name: true, 
-            code: true,
-            staffAssignments: {
-              include: {
-                staff: { select: { id: true, name: true } }
+    const [documents, totalCount] = await Promise.all([
+      prisma.document.findMany({
+        where,
+        include: {
+          student: { select: { name: true, email: true, photo: true } },
+          documentType: {
+            select: {
+              name: true,
+              code: true,
+              staffAssignments: {
+                include: { staff: { select: { id: true, name: true } } }
               }
             }
-          } 
-        },
-        semester: { select: { name: true, code: true, schoolYear: true } },
-        assignedStaff: { select: { name: true, email: true } },
-        activityLogs: {
-          include: {
-            performedBy: { select: { name: true, email: true, role: true } }
           },
-          orderBy: { createdAt: 'asc' }
-        }
-      },
-      orderBy: { createdAt: 'desc' },
-      skip,
-      take: limitNum
-    }),
-    prisma.document.count({ where })
-  ]);
+          semester: { select: { name: true, code: true, schoolYear: true } },
+          assignedStaff: { select: { name: true, email: true } },
+          activityLogs: {
+            include: {
+              performedBy: { select: { name: true, email: true, role: true } }
+            },
+            orderBy: { createdAt: 'asc' }
+          }
+        },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limitNum
+      }),
+      prisma.document.count({ where })
+    ]);
 
     res.status(200).json({
       success: true,
@@ -203,9 +175,6 @@ exports.getDocuments = async (req, res) => {
   }
 };
 
-// @desc    Get single document by ID
-// @route   GET /api/documents/:id
-// @access  Private
 exports.getDocument = async (req, res) => {
   try {
     const document = await prisma.document.findUnique({
@@ -226,7 +195,6 @@ exports.getDocument = async (req, res) => {
 
     if (!document) return res.status(404).json({ message: 'Document not found' });
 
-    // Access control
     const hasAccess =
       req.user.role === 'admin' ||
       req.user.role === 'staff' ||
@@ -240,9 +208,6 @@ exports.getDocument = async (req, res) => {
   }
 };
 
-// @desc    Track document by tracking code (public)
-// @route   GET /api/documents/track/:trackingCode
-// @access  Public
 exports.trackDocument = async (req, res) => {
   try {
     const document = await prisma.document.findUnique({
@@ -276,9 +241,6 @@ exports.trackDocument = async (req, res) => {
   }
 };
 
-// @desc    Assign document to staff
-// @route   PATCH /api/documents/:id/assign
-// @access  Private (Admin/Staff)
 exports.assignDocument = async (req, res) => {
   try {
     const { staffId } = req.body;
@@ -292,21 +254,12 @@ exports.assignDocument = async (req, res) => {
     const updated = await prisma.document.update({
       where: { id: docId },
       data: { assignedStaffId: newStaffId },
-      include: {
-        assignedStaff: { select: { name: true, email: true } }
-      }
+      include: { assignedStaff: { select: { name: true, email: true } } }
     });
 
     if (newStaffId) {
-      const staff = await prisma.user.findUnique({
-        where: { id: newStaffId },
-        select: { name: true }
-      });
-      await logActivity(
-        docId,
-        req.user.id,
-        `Assigned to ${staff?.name || 'staff'}`
-      );
+      const staff = await prisma.user.findUnique({ where: { id: newStaffId }, select: { name: true } });
+      await logActivity(docId, req.user.id, `Assigned to ${staff?.name || 'staff'}`);
     } else {
       await logActivity(docId, req.user.id, 'Document unassigned');
     }
@@ -321,9 +274,6 @@ exports.assignDocument = async (req, res) => {
   }
 };
 
-// @desc    Update document status
-// @route   PATCH /api/documents/:id/status
-// @access  Private (Staff/Admin)
 exports.updateDocumentStatus = async (req, res) => {
   try {
     const { status, remarks, notifyStudent, reassignToStaffId } = req.body;
@@ -335,26 +285,25 @@ exports.updateDocumentStatus = async (req, res) => {
     });
     if (!document) return res.status(404).json({ message: 'Document not found' });
 
-      const isUnassigning = (reassignToStaffId === '' || reassignToStaffId === 'unassign') && document.assignedStaffId !== null;
+    const isUnassigning = (reassignToStaffId === '' || reassignToStaffId === 'unassign') && document.assignedStaffId !== null;
 
-
-    // Staff can update all documents and their assignments
     if (req.user.role === 'staff' && document.assignedStaffId !== null && document.assignedStaffId !== req.user.id) {
       return res.status(403).json({ message: 'This document is assigned to another staff member.' });
     }
 
     const fromStatus = document.status;
 
-    // Handle scanned file upload
-    const scannedFileUrl = req.file ? req.file.path : document.scannedFileUrl;
-    const scannedFileName = req.file ? req.file.originalname : document.scannedFileName;
+    // Handle file upload — action_required uses actionRequiredFileUrl, others use scannedFileUrl
+    const isActionRequired = status === 'action_required';
+    const scannedFileUrl = !isActionRequired && req.file ? req.file.path : document.scannedFileUrl;
+    const scannedFileName = !isActionRequired && req.file ? req.file.originalname : document.scannedFileName;
+    const actionRequiredFileUrl = isActionRequired && req.file ? req.file.path : document.actionRequiredFileUrl;
+    const actionRequiredFileName = isActionRequired && req.file ? req.file.originalname : document.actionRequiredFileName;
 
-    // Handle reassignment
     const newStaffId = reassignToStaffId && reassignToStaffId !== 'unassign' && reassignToStaffId !== ''
       ? parseInt(reassignToStaffId)
       : isUnassigning ? null : document.assignedStaffId;
 
-    // Auto-release for online receiving when completed
     const finalStatus = (status === 'completed' && document.releaseMethod === 'online')
       ? 'released'
       : status;
@@ -366,6 +315,8 @@ exports.updateDocumentStatus = async (req, res) => {
         remarks: remarks || document.remarks,
         scannedFileUrl,
         scannedFileName: scannedFileName || null,
+        actionRequiredFileUrl,
+        actionRequiredFileName: actionRequiredFileName || null,
         assignedStaffId: newStaffId,
         notifyStudent: notifyStudent === 'true' || notifyStudent === true
       },
@@ -377,16 +328,16 @@ exports.updateDocumentStatus = async (req, res) => {
     });
 
     const actionMessages = {
-      submitted:     'Document submitted',
-      received:      'Document received at office',
-      processing:    'Document is being processed',
-      for_signature: 'Document sent for signature',
-      completed:     'Document processing completed',
-      released:      'Document released to student',
-      rejected:      'Document rejected',
+      submitted:        'Document submitted',
+      received:         'Document received at office',
+      processing:       'Document is being processed',
+      action_required:  'Action required from student',
+      for_signature:    'Document sent for signature',
+      completed:        'Document processing completed',
+      released:         'Document released to student',
+      rejected:         'Document rejected',
     };
 
-    // Build action text based on what changed
     const statusChanged = finalStatus !== fromStatus;
     const newReassignId = parseInt(reassignToStaffId);
     const assignmentChanged = (!isNaN(newReassignId) && newReassignId !== document.assignedStaffId) || isUnassigning;
@@ -411,19 +362,11 @@ exports.updateDocumentStatus = async (req, res) => {
       }
     }
 
-    // if nothing changed but a file was uploaded
     if (!actionText && req.file) {
       actionText = 'Document file updated';
     }
 
-    await logActivity(
-      docId,
-      req.user.id,
-      actionText,
-      fromStatus,
-      finalStatus,
-      remarks || null
-    );
+    await logActivity(docId, req.user.id, actionText, fromStatus, finalStatus, remarks || null);
 
     res.status(200).json({
       success: true,
@@ -435,9 +378,6 @@ exports.updateDocumentStatus = async (req, res) => {
   }
 };
 
-// @desc    Mark in-person document as received (triggers auto-assign + processing)
-// @route   PATCH /api/documents/:id/receive
-// @access  Private (Staff/Admin)
 exports.receiveDocument = async (req, res) => {
   try {
     const docId = parseInt(req.params.id);
@@ -472,19 +412,52 @@ exports.receiveDocument = async (req, res) => {
       remarks
     );
 
-    res.status(200).json({
-      success: true,
-      message: 'Document marked as received',
-      document: updated
-    });
+    res.status(200).json({ success: true, message: 'Document marked as received', document: updated });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
 
-// @desc    Delete document (Student: only if Submitted; Admin: anytime)
-// @route   DELETE /api/documents/:id
-// @access  Private
+// @desc    Student submits revised file in response to action_required
+// @route   PATCH /api/documents/:id/revise
+// @access  Private (Student)
+exports.submitRevision = async (req, res) => {
+  try {
+    const docId = parseInt(req.params.id);
+
+    const document = await prisma.document.findUnique({ where: { id: docId } });
+    if (!document) return res.status(404).json({ message: 'Document not found' });
+
+    if (document.studentId !== req.user.id) {
+      return res.status(403).json({ message: 'Not authorized' });
+    }
+
+    if (document.status !== 'action_required') {
+      return res.status(400).json({ message: 'Document is not awaiting revision' });
+    }
+
+    const revisedFileUrl = req.file ? req.file.path : document.revisedFileUrl;
+    const revisedFileName = req.file ? req.file.originalname : document.revisedFileName;
+
+    const updated = await prisma.document.update({
+      where: { id: docId },
+      data: { revisedFileUrl, revisedFileName }
+    });
+
+    await logActivity(
+      docId,
+      req.user.id,
+      'Student submitted revised file',
+      'action_required',
+      'action_required'
+    );
+
+    res.status(200).json({ success: true, message: 'Revision submitted successfully', document: updated });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 exports.deleteDocument = async (req, res) => {
   try {
     const docId = parseInt(req.params.id);
@@ -501,8 +474,13 @@ exports.deleteDocument = async (req, res) => {
       });
     }
 
-    // Delete files from Cloudinary
-    const filesToDelete = [document.studentFileUrl, document.scannedFileUrl].filter(Boolean);
+    const filesToDelete = [
+      document.studentFileUrl,
+      document.scannedFileUrl,
+      document.actionRequiredFileUrl,
+      document.revisedFileUrl
+    ].filter(Boolean);
+
     for (const url of filesToDelete) {
       const parts = url.split('/');
       const publicId = `dts-documents/${parts[parts.length - 1].split('.')[0]}`;
@@ -516,7 +494,7 @@ exports.deleteDocument = async (req, res) => {
       document.status,
       null
     );
-    
+
     await prisma.document.delete({ where: { id: docId } });
 
     res.status(200).json({ success: true, message: 'Document deleted successfully' });
@@ -525,16 +503,13 @@ exports.deleteDocument = async (req, res) => {
   }
 };
 
-// @desc    Get document stats
-// @route   GET /api/documents/stats
-// @access  Private
 exports.getDocumentStats = async (req, res) => {
   try {
     const where = req.user.role === 'student' ? { studentId: req.user.id } : {};
 
     const [total, inProgress, completed, released, rejected] = await Promise.all([
       prisma.document.count({ where }),
-      prisma.document.count({ where: { ...where, status: { in: ['submitted', 'received', 'processing', 'for_signature'] } } }),
+      prisma.document.count({ where: { ...where, status: { in: ['submitted', 'received', 'processing', 'action_required', 'for_signature'] } } }),
       prisma.document.count({ where: { ...where, status: 'completed' } }),
       prisma.document.count({ where: { ...where, status: 'released' } }),
       prisma.document.count({ where: { ...where, status: 'rejected' } })
