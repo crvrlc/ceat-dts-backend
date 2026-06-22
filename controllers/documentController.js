@@ -318,7 +318,11 @@ exports.updateDocumentStatus = async (req, res) => {
         actionRequiredFileUrl,
         actionRequiredFileName: actionRequiredFileName || null,
         assignedStaffId: newStaffId,
-        notifyStudent: notifyStudent === 'true' || notifyStudent === true
+        notifyStudent: notifyStudent === 'true' || notifyStudent === true,
+        // Reset response flag when setting action_required
+        ...(finalStatus === 'action_required' && {
+          hasRespondedToActionRequired: false,
+        }),
       },
       include: {
         student: { select: { name: true, email: true } },
@@ -423,6 +427,11 @@ exports.receiveDocument = async (req, res) => {
 // @access  Private (Student)
 exports.submitRevision = async (req, res) => {
   try {
+
+    if (!req.file) {
+      return res.status(400).json({ message: 'Please attach a file before submitting.' });
+    }
+
     const docId = parseInt(req.params.id);
 
     const document = await prisma.document.findUnique({ where: { id: docId } });
@@ -436,12 +445,16 @@ exports.submitRevision = async (req, res) => {
       return res.status(400).json({ message: 'Document is not awaiting revision' });
     }
 
-    const revisedFileUrl = req.file ? req.file.path : document.revisedFileUrl;
-    const revisedFileName = req.file ? req.file.originalname : document.revisedFileName;
+    const revisedFileUrl = req.file.path;
+    const revisedFileName = req.file.originalname;
 
     const updated = await prisma.document.update({
       where: { id: docId },
-      data: { revisedFileUrl, revisedFileName }
+      data: {
+        revisedFileUrl,
+        revisedFileName,
+        hasRespondedToActionRequired: true,
+      }
     });
 
     await logActivity(

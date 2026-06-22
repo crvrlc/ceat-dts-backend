@@ -172,6 +172,7 @@ model Document {
   // Action Required fields
   actionRequiredFileUrl   String?   // file staff sends to student
   actionRequiredFileName  String?
+  hasRespondedToActionRequired Boolean @default(false)
 
   // Student's response to action required
   revisedFileUrl    String?
