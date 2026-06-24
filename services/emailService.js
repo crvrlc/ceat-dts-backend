@@ -1,3 +1,4 @@
+import ceat_logo from '../images/ceat-logo.png';
 const { google } = require('googleapis');
 
 const getGmailClient = async () => {
@@ -55,7 +56,7 @@ const sendDocumentUpdateEmail = async ({ studentName, studentEmail, trackingCode
   const statusLabel = STATUS_LABELS[status] || status;
 
   const statusColors = {
-    submitted:     { bg: '#fef6e0', text: '#7a4f00', border: '#f5a800' },
+    submitted:      { bg: '#f3f4f6', text: '#4b5563', dot: '#9ca3af' },
     received:      { bg: '#dbeafe', text: '#1e40af', border: '#3b82f6' },
     processing:    { bg: '#ede9fe', text: '#4c1d95', border: '#8b5cf6' },
     action_required: { bg: '#fff3cd', text: '#856404', border: '#ffc107' },
@@ -72,6 +73,7 @@ const sendDocumentUpdateEmail = async ({ studentName, studentEmail, trackingCode
       
       <!-- Header -->
       <div style="background: #7b1113; border-radius: 10px 10px 0 0; padding: 24px 28px; text-align: center;">
+        <img src={ceat_logo} alt="CEAT Logo" style="width: 60px; height: 60px; object-fit: contain; margin-bottom: 10px;" />
         <h2 style="color: #fff; margin: 0; font-size: 18px; font-weight: 700; letter-spacing: 0.3px;">
           CEAT Office of the College Secretary
         </h2>
@@ -125,7 +127,7 @@ const sendDocumentUpdateEmail = async ({ studentName, studentEmail, trackingCode
         </div>
 
         <p style="color: #374151; font-size: 14px; margin: 0 0 4px;">
-          If you have any questions, please contact the CEAT OCS office.
+          If you have any questions, please contact the CEAT OCS office at ceat_ocs.uplb@up.edu.ph.
         </p>
 
         <p style="color: #374151; font-size: 14px; margin: 20px 0 0;">
