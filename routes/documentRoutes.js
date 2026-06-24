@@ -14,7 +14,6 @@ const {
 const { protect, authorize } = require('../middleware/authMiddleware');
 const upload = require('../middleware/upload');
 const prisma = require('../config/prisma');
-const { sendDocumentUpdateEmail } = require('../services/emailService');
 
 const router = express.Router();
 
@@ -39,6 +38,7 @@ router.patch('/:id/receive', protect, authorize('staff', 'admin'), receiveDocume
 // Email notification
 router.post('/:id/notify', protect, authorize('staff', 'admin'), async (req, res) => {
   try {
+    const { sendDocumentUpdateEmail } = require('../services/emailService');
     const { status, remark } = req.body;
 
     const document = await prisma.document.findUnique({
