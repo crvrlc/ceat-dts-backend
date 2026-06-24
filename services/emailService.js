@@ -1,4 +1,5 @@
-import ceat_logo from '../images/ceat-logo.png';
+const path = require('path');
+const ceat_logo = path.join(__dirname, '../images/ceat-logo.png');
 const { google } = require('googleapis');
 
 const getGmailClient = async () => {
