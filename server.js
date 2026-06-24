@@ -4,6 +4,7 @@ const express = require('express');
 const cors = require('cors');
 const session = require('express-session');
 const passport = require('./config/passport');
+const multer = require('multer');
 
 const app = express();
 
@@ -46,6 +47,16 @@ app.use('/api/student-registrations', require('./routes/studentRegistrationRoute
 app.use('/api/semesters', require('./routes/semesterRoutes'));
 app.use('/api/reports', require('./routes/reportRoutes'));
 app.use('/api/activity-logs', require('./routes/activityLogRoutes'));
+
+app.use((err, req, res, next) => {
+  if (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE') {
+    return res.status(400).json({ message: 'File is too large. Maximum size is 10MB.' });
+  }
+  if (err) {
+    return res.status(400).json({ message: err.message || 'An unexpected error occurred.' });
+  }
+  next();
+});
 
 // Health check
 app.get('/', (req, res) => {
